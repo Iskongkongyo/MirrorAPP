@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<!-- 最新版照镜子
+		 manifest.json配置文件中需进行如下设置
+		 "screenOrientation" : [ "portrait-primary","portrait-secondary","landscape-primary","landscape-secondary" ]来保证横屏和竖屏都能较好展示
+		 -->
+		<title>照镜子</title>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<style>
+			* {
+				/* 去除浏览器默认内外边距 */
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+
+			#videoElement {
+				width: 100vw;
+				height: 100vh;
+				background-color: #666;
+				object-fit: fill;
+			}
+
+
+			/* 模态框的遮罩层样式 */
+			.modal {
+				position: fixed;
+				/* 停留在页面上，不随页面滚动 */
+				z-index: 1;
+				/* 设置在其它元素之上 */
+				left: 0;
+				top: 0;
+				width: 100%;
+				/* 覆盖全屏 */
+				height: 100%;
+				/* 覆盖全屏 */
+				overflow: auto;
+				/* 允许滚动条在需要时出现 */
+				background-color: rgba(0, 0, 0, 0.4);
+				/* 黑色背景，半透明 */
+				align-items: center;
+				/* 垂直居中 */
+				justify-content: center;
+				/* 水平居中 */
+				display: flex;
+				/* 使用Flexbox进行居中 */
+			}
+
+			/* 模态框内容样式 */
+			.modal-content {
+				background-color: #fefefe;
+				margin: auto;
+				/* 水平垂直居中 */
+				padding: 20px;
+				border: 1px solid #888;
+				width: 70%;
+				/* 宽度占屏幕70% */
+				max-height: 80vh;
+				/* 高度适中，占视口高度的80% */
+				overflow-y: auto;
+				/* 允许内容垂直滚动 */
+				box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+				text-align: center;
+				/* 文本内容水平居中 */
+			}
+
+			/* 标题样式 */
+			#modalTitle {
+				text-align: center;
+				/* 标题水平居中（这里其实已经由父元素.modal-content的text-align继承）*/
+			}
+
+			/* 按钮样式 */
+			.modal-content button {
+				background-color: #00aaff;
+				/* 绿色背景 */
+				border: none;
+				/* 去除边框 */
+				color: white;
+				/* 文本颜色为白色 */
+				padding: 10px 20px;
+				/* 内边距 */
+				text-align: center;
+				/* 文本水平居中 */
+				text-decoration: none;
+				/* 去除下划线 */
+				display: inline-block;
+				/* 行内块级元素 */
+				font-size: 15px;
+				/* 字体大小 */
+				margin: 4px 2px;
+				/* 外边距 */
+				cursor: pointer;
+				/* 鼠标悬停时显示小手 */
+				border-radius: 4px;
+				/* 圆角 */
+			}
+
+			/* 取消按钮样式（可选，如果你想要给取消按钮不同的样式） */
+			.modal-content button#cancelBtn {
+				background-color: #f44336;
+				/* 红色背景 */
+			}
+
+			/* 当模态框显示时，为body添加样式以禁止滚动 */
+			.modal:target {
+				display: flex;
+			}
+
+			.modal:target~.no-scroll {
+				overflow: hidden;
+			}
+		</style>
+	</head>
+	<body>
+
+		<!-- 提示框 -->
+		<div id="myModal" class="modal" style="display: none;">
+			<div class="modal-content">
+				<h2 id="modalTitle">温馨提示</h2><br />
+				<p id="modalContent">1.点击确定后找到权限管理</p>
+				<p id="modalContent">然后点击摄像头最后选择使</p>
+				<p id="modalContent">用时允许即可，当然你可以</p>
+				<p id="modalContent">点击取消强制退出本APP！</p>
+				<p id="modalContent">2.本APP支持横竖屏，切换</p>
+				<p id="modalContent">时开启自动旋转体验更佳！</p>
+				<br/>
+				<button onclick="handleConfirm()">确定</button>
+				<button id="cancelBtn" onclick="handleCancel()">取消</button>
+			</div>
+		</div>
+
+		<video style="outline:none;display:none;" tableindex="0" controlslist="nodownload" autoplay="true"
+			id="videoElement"></video>
+		<script>
+			//处理确定事件
+			function handleConfirm() {
+				var Intent = plus.android.importClass("android.content.Intent");
+				var Settings = plus.android.importClass(
+					"android.provider.Settings");
+				var Uri = plus.android.importClass("android.net.Uri");
+				var mainActivity = plus.android.runtimeMainActivity();
+				var intent = new Intent();
+				intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+				var uri = Uri.fromParts("package", mainActivity.getPackageName(),
+					null);
+				intent.setData(uri);
+				mainActivity.startActivity(intent);
+				//关闭APP
+				plus.runtime.quit();
+			}
+
+			//处理取消事件
+			function handleCancel() {
+				//关闭APP
+				plus.runtime.quit();
+			}
+
+			window.onload = function() {
+				const video = document.querySelector("#videoElement");
+				let listener = 0; // 存储监视器ID
+				let getPower = true; // 是否获取到手机相机授权
+
+
+				function showModal() {
+					var modal = document.getElementById("myModal");
+					modal.style.display = "flex";
+				}
+
+				function closeModal() {
+					var modal = document.getElementById("myModal");
+					modal.style.display = "none";
+				}
+
+				//开启摄像头
+				function startCamera() {
+					if (navigator.mediaDevices.getUserMedia) {
+						navigator.mediaDevices
+							.getUserMedia({
+								video: true
+							})
+							.then(function(stream) {
+								video.srcObject = stream;
+								clearInterval(listener); //清除监视器
+								video.style.display = "block"; // 视频可视
+							})
+							.catch(function(error) {
+								video.style.display = "none"; // 视频不可视
+
+								listener = setInterval(function() {
+									if (navigator.mediaDevices.getUserMedia) {
+										navigator.mediaDevices
+											.getUserMedia({
+												video: true
+											})
+											.then(function(stream) {
+												clearInterval(listener); //清除监视器
+												video.style.display = "block"; // 视频可视
+												video.srcObject = stream;
+											})
+									}
+
+								}, 1000);
+
+							});
+					}
+				}
+
+				function startMirror() {
+					// 获取摄像头权限  
+					plus.android.requestPermissions(['android.permission.CAMERA'],
+						(e) => {
+							if (e.granted.length > 0) {
+								// 权限被授予，现在可以开启摄像头  
+								startCamera();
+							} else if (e.deniedAlways.length > 0) {
+								// 弹出提示框解释为何需要权限，引导用户打开设置页面开启  
+								showModal();
+							} else if (e.deniedPresent.length > 0) { //权限被临时拒绝  
+								// 弹出提示框解释为何需要权限，可再次调用plus.android.requestPermissions申请权限  
+								showModal();
+							}
+						})
+				}
+
+				//等待plus初始化后再调用
+				if (window.plus) {
+					startMirror();
+				} else {
+					document.addEventListener('plusready', startMirror, false);
+				}
+
+			}
+		</script>
+	</body>
+</html>
